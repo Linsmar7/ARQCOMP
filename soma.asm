@@ -9,7 +9,8 @@ ttl:	.float
 first:	.asciiz "Informe o primeiro numero: "
 secnd:	.asciiz "Informe o segundo numero: "
 res:	.asciiz "Soma: "
-error:	.asciiz "Resultado descartado! "
+error:	.asciiz "Resultado descartado!\n"
+espaco: .asciiz "\n"
 
 .text   
 .globl  main            	
@@ -55,6 +56,9 @@ la $a0, res
 syscall
 mov.s $f12, $f5
 li $v0, 2
+syscall
+li $v0, 4
+la $a0, espaco
 syscall
 
 FINAL:
