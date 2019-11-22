@@ -1,9 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/wait.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <omp.h>
 
 #define QTDE_LINHAS_MATRIZ 2
 #define QTDE_COLUNAS_MATRIZ 3
 #define TAM_VETOR 3
+#define NUM_THREADS 2
 
 // Ax = b
 int matriz_A[QTDE_LINHAS_MATRIZ][QTDE_COLUNAS_MATRIZ]; // nao precisa ser matriz quadrada
@@ -24,42 +29,84 @@ int geraDados() {
   for (i=0; i<TAM_VETOR; i++) vetor_x[i] = i+2;
   // inicializa vetor_b
   for (i=0; i<QTDE_LINHAS_MATRIZ; i++) vetor_b[i] = 0;
+  // matriz_A[0][0] = 1;
+  // matriz_A[0][1] = 4;
+  // matriz_A[0][2] = 3;
+  // matriz_A[1][0] = 2;
+  // matriz_A[1][1] = 2;
+  // matriz_A[1][2] = 1;
+  // vetor_x[0] = 1;
+  // vetor_x[1] = 2;
+  // vetor_x[2] = 3;
   return 0;
 }
 
+void zerarVetor() {
+  for (int i = 0; i < TAM_VETOR; i++) {
+      vetor_b[i] = 0;
+  }
+}
 // multiplicacao sequencial do vetor pela matriz
 // TO DO: implementar a funcao Ax=b e coletar o tempo sequencial
 int matvecSequencial() {
-  int i, j;
-  int matriz_temp[QTDE_LINHAS_MATRIZ][QTDE_COLUNAS_MATRIZ]; // matriz temporaria
-
-  for (j=0; j<QTDE_COLUNAS_MATRIZ; j++)  // percorre a matriz_A coluna por coluna
-    for (i=0; i<QTDE_LINHAS_MATRIZ; i++) {
-      // matriz_temp armazena cada entrada de A * cada elemento de X
-      matriz_temp[i][j] = matriz_A[i][j] * vetor_x[j];
+  printf("Sequencial\n");
+  struct timeval tv1, tv2;
+  double t1, t2;
+  gettimeofday(&tv1, NULL);
+  t1 = (double)(tv1.tv_sec) + (double)(tv1.tv_usec)/1000000.00;
+  for (int i = 0; i < QTDE_LINHAS_MATRIZ; i++) {
+    for (int j = 0; j < QTDE_COLUNAS_MATRIZ; j++) {
+      vetor_b[i] += vetor_x[j] * matriz_A[i][j];
     }
-  // gera o vetor de resultado B
-  for (i=0; i<QTDE_LINHAS_MATRIZ; i++)  // percorre a matriz_temp linha a linha
-    for (j=0; j<QTDE_COLUNAS_MATRIZ; j++) {
-    // vetor_b = somatorio dos elementos da linha da matriz_temp
-    vetor_b[i] += matriz_temp[i][j];
-    }
-  // debug - verifica o resultado
-  for (i=0; i<QTDE_LINHAS_MATRIZ; i++) printf("%d\n", vetor_b[i]);
+  }
+  gettimeofday(&tv2, NULL);
+  t2 = (double)(tv2.tv_sec) + (double)(tv2.tv_usec)/1000000.00;
+  for (int i = 0; i < TAM_VETOR-1; i++) {
+    printf("vetor_b[%d]: ", i);
+    printf("%d\n", vetor_b[i]);
+  }
+  printf("O tempo de execucao sequencial foi: %lf\n", (t2-t1));
+  zerarVetor();
   return 0;
 }
 
 // multiplicacao paralela (OpenMP) do vetor pela matriz
 // TO DO: implementar a funcao Ax=b e coletar o tempo paralelo OpenMP
 int matvecHost() {
-  printf("matvecHost\n");
+  printf("Host\n");
+  int tid;
+  int pedaco_chunk = 1;
+  int q, w;
+  struct timeval tv1, tv2;
+  double t1, t2;
+  omp_set_num_threads(NUM_THREADS);
+  gettimeofday(&tv1, NULL);
+  t1 = (double)(tv1.tv_sec) + (double)(tv1.tv_usec)/1000000.00;
+    #pragma omp parallel private (tid) shared(vetor_b, vetor_x, matriz_A, q, w) // cria um bloco de n threads
+    {
+      tid = omp_get_thread_num();
+      #pragma omp for schedule(static, pedaco_chunk)
+      for (q = 0; q < QTDE_LINHAS_MATRIZ; q++) {
+        for (w = 0; w < QTDE_COLUNAS_MATRIZ; w++) {
+          vetor_b[q] += vetor_x[w] * matriz_A[q][w];
+        }
+      }
+      #pragma omp for schedule(static, pedaco_chunk)
+      for (q = 0; q < TAM_VETOR-1; q++) {
+        printf("[Thread: %d] vetor_b[%d]: %d\n", tid, q, vetor_b[q]);
+      }
+    }
+    gettimeofday(&tv2, NULL);
+    t2 = (double)(tv2.tv_sec) + (double)(tv2.tv_usec)/1000000.00;
+    printf("O tempo de execucao sequencial foi: %lf\n", (t2-t1));
+    zerarVetor();
   return 0;
 }
 
 // multiplicacao paralela (CUDA) do vetor pela matriz
 // TO DO: implementar a funcao Ax=b e coletar o tempo paralelo CUDA
 int matvecDevice() {
-  printf("matvecDevice\n");
+  printf("Device\n");
   return 0;
 }
 
