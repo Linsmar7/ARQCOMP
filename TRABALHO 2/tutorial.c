@@ -5,10 +5,10 @@
 #include <sys/types.h>
 #include <omp.h>
 
-#define QTDE_LINHAS_MATRIZ 2
-#define QTDE_COLUNAS_MATRIZ 3
-#define TAM_VETOR 3
-#define NUM_THREADS 2
+#define QTDE_LINHAS_MATRIZ 10000
+#define QTDE_COLUNAS_MATRIZ 10000
+#define TAM_VETOR QTDE_COLUNAS_MATRIZ
+#define NUM_THREADS 100
 
 // Ax = b
 int matriz_A[QTDE_LINHAS_MATRIZ][QTDE_COLUNAS_MATRIZ]; // nao precisa ser matriz quadrada
@@ -29,15 +29,6 @@ int geraDados() {
   for (i=0; i<TAM_VETOR; i++) vetor_x[i] = i+2;
   // inicializa vetor_b
   for (i=0; i<QTDE_LINHAS_MATRIZ; i++) vetor_b[i] = 0;
-  // matriz_A[0][0] = 1;
-  // matriz_A[0][1] = 4;
-  // matriz_A[0][2] = 3;
-  // matriz_A[1][0] = 2;
-  // matriz_A[1][1] = 2;
-  // matriz_A[1][2] = 1;
-  // vetor_x[0] = 1;
-  // vetor_x[1] = 2;
-  // vetor_x[2] = 3;
   return 0;
 }
 
@@ -61,12 +52,11 @@ int matvecSequencial() {
   }
   gettimeofday(&tv2, NULL);
   t2 = (double)(tv2.tv_sec) + (double)(tv2.tv_usec)/1000000.00;
-  for (int i = 0; i < TAM_VETOR-1; i++) {
+  /*for (int i = 0; i < TAM_VETOR; i++) {
     printf("vetor_b[%d]: ", i);
     printf("%d\n", vetor_b[i]);
-  }
+  }*/
   printf("O tempo de execucao sequencial foi: %lf\n", (t2-t1));
-  zerarVetor();
   return 0;
 }
 
@@ -82,7 +72,7 @@ int matvecHost() {
   omp_set_num_threads(NUM_THREADS);
   gettimeofday(&tv1, NULL);
   t1 = (double)(tv1.tv_sec) + (double)(tv1.tv_usec)/1000000.00;
-    #pragma omp parallel private (tid) shared(vetor_b, vetor_x, matriz_A, q, w) // cria um bloco de n threads
+    #pragma omp parallel private (tid, q, w) shared(vetor_b, vetor_x, matriz_A) // cria um bloco de n threads
     {
       tid = omp_get_thread_num();
       #pragma omp for schedule(static, pedaco_chunk)
@@ -91,15 +81,15 @@ int matvecHost() {
           vetor_b[q] += vetor_x[w] * matriz_A[q][w];
         }
       }
-      #pragma omp for schedule(static, pedaco_chunk)
-      for (q = 0; q < TAM_VETOR-1; q++) {
+      /*#pragma omp for schedule(static, pedaco_chunk)
+      for (q = 0; q < TAM_VETOR; q++) {
         printf("[Thread: %d] vetor_b[%d]: %d\n", tid, q, vetor_b[q]);
-      }
+      }*/
     }
     gettimeofday(&tv2, NULL);
     t2 = (double)(tv2.tv_sec) + (double)(tv2.tv_usec)/1000000.00;
-    printf("O tempo de execucao sequencial foi: %lf\n", (t2-t1));
-    zerarVetor();
+    printf("O tempo de execucao paralela foi: %lf\n", (t2-t1));
+    
   return 0;
 }
 
@@ -117,9 +107,16 @@ int main(int argc, char * argv[]) {
   geraDados();
   // programa deve realizar a multiplicacao sequencial e capturar tempo
   matvecSequencial();
+  zerarVetor();
   // programa deve testar parametro da linha de comando (1 – CPU e 2 – GPU)
-  if (op_exec == 1) matvecHost();
-  else if (op_exec == 2) matvecDevice();
+  if (op_exec == 1) {
+    matvecHost();
+    zerarVetor();
+  }
+  else if (op_exec == 2) {
+    matvecDevice();
+    zerarVetor();
+  }
   //
   return 0;
 }
